@@ -24,10 +24,11 @@ public class GameController : MonoBehaviour
 
 
     [Header("Boids Rules")]
-    public int cohesionForce = 5;
-    public int linkingForce = 5;
-    public int explosionForce = 15;
-    public int randomForce = 15;
+    public float cohesionForce = 5;
+    public float linkingForce = 5;
+    public float explosionForce = 15;
+    public float randomForce = 15;
+    public float distanceToGetBack = 20;
 
     public Transform focusPoint;
 
@@ -114,7 +115,8 @@ public class GameController : MonoBehaviour
 
     private bool isDetected(BoidController detector, BoidController detectee)
     {
-        float angle = Vector3.Angle(detector.transform.forward, detectee.transform.position - detector.transform.position);
+        if (detector.sensor == null) return false;
+        float angle = Vector3.Angle(detector.sensor.forward, detectee.transform.position - detector.sensor.position);
         return angle < detectionAngle;
     }
 

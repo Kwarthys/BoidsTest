@@ -9,6 +9,7 @@ public class BoidController : MonoBehaviour {
     private int index;
 
     private Transform nose;
+    public Transform sensor;
 
     private Rigidbody rb;
 
@@ -17,6 +18,7 @@ public class BoidController : MonoBehaviour {
         GetComponent<Rigidbody>().velocity = transform.forward * 20;
 
         nose = transform.Find("nose").GetComponent<Transform>();
+        sensor = transform.Find("sensor").GetComponent<Transform>();
 
         rb = GetComponent<Rigidbody>();
 
@@ -55,9 +57,11 @@ public class BoidController : MonoBehaviour {
                 }
             }
 
-            othersVelocity /= sum;
-
-            followFlock(othersVelocity);
+            if(sum != 0)
+            {
+                othersVelocity /= sum;
+                followFlock(othersVelocity);
+            }            
         }
 
         getBackToCenter();
@@ -69,16 +73,25 @@ public class BoidController : MonoBehaviour {
     private void getBackToCenter()
     {
         Vector3 centerPos = gameController.focusPoint.position;
-        Vector3 forceTowardsCenter = Vector3.ProjectOnPlane(centerPos-transform.position, transform.forward).normalized * Vector3.Distance(transform.position, centerPos) * Vector3.Distance(transform.position, centerPos) / 600;
-        rb.AddForceAtPosition(forceTowardsCenter, nose.position);
+        float distToCenter = Vector3.Distance(transform.position, centerPos);
+        if (distToCenter > gameController.distanceToGetBack)
+        {
+            Vector3 forceTowardsCenter = Vector3.ProjectOnPlane(centerPos - transform.position, transform.forward).normalized * 2 * (distToCenter - gameController.distanceToGetBack);
+
+            //Debug.DrawRay(transform.position, forceTowardsCenter, Color.blue, 1f);
+
+            rb.AddForceAtPosition(forceTowardsCenter, nose.position);
+        }
+        
     }
 
     private void followFlock(Vector3 othersVelocity)
     {
-        Vector3 force = (othersVelocity - rb.velocity).normalized * gameController.cohesionForce;
+        Vector3 force = (othersVelocity - rb.velocity) * 0.5f * gameController.cohesionForce;
 
-        force = Vector3.ProjectOnPlane(force, transform.forward);
+        force = Vector3.ProjectOnPlane(force, transform.forward) * force.magnitude;
 
+        //Debug.DrawRay(transform.position, force, Color.red, 1f);
         rb.AddForceAtPosition(force, nose.position);
     }
 
