@@ -38,7 +38,7 @@ RenderSettings:
   m_ReflectionIntensity: 1
   m_CustomReflection: {fileID: 0}
   m_Sun: {fileID: 0}
-  m_IndirectSpecularColor: {r: 0.44657874, g: 0.49641258, b: 0.5748172, a: 1}
+  m_IndirectSpecularColor: {r: 0.44657868, g: 0.4964127, b: 0.57481724, a: 1}
   m_UseRadianceAmbientProbe: 0
 --- !u!157 &3
 LightmapSettings:
@@ -122,7 +122,6 @@ GameObject:
   m_Component:
   - component: {fileID: 72558091}
   - component: {fileID: 72558090}
-  - component: {fileID: 72558092}
   m_Layer: 0
   m_Name: GameController
   m_TagString: Untagged
@@ -144,7 +143,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   boidPrefab: {fileID: 1142103991707088, guid: 042657145e9482b4da19761852779efa, type: 3}
   spawnArea: 100
-  flockSize: 100
+  flockSize: 50
 --- !u!4 &72558091
 Transform:
   m_ObjectHideFlags: 0
@@ -159,18 +158,6 @@ Transform:
   m_Father: {fileID: 0}
   m_RootOrder: 2
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &72558092
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 72558089}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 01f8d61d7ceb52d4098e024ba993559a, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
 --- !u!1 &1390155647
 GameObject:
   m_ObjectHideFlags: 0

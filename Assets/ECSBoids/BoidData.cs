@@ -18,73 +18,112 @@ public class BoidData : MonoBehaviour
 
 class BoidSystem : ComponentSystem
 {
-    struct comp
+    struct Comp
     {
         public BoidData data;
         public Transform t;
     }
 
-    protected override void OnUpdate()
+    private bool isDetected(Comp detector, Comp detectee)
     {
-        foreach(comp e in GetEntities<comp>())
+        if (detector.data.sensor == null) return false;
+        float angle = Vector3.Angle(detector.data.sensor.forward, detectee.t.position - detector.data.sensor.position);
+        return angle < detector.data.detectionAngle;
+    }
+
+
+    private void addToDetecs(Dictionary<Comp, List<Comp>> perceptions, Comp detector, Comp detected)
+    {
+        if (perceptions.ContainsKey(detector))
         {
-
-            Vector3 direction = e.t.forward;
-            //e.t.position += e.data.speed * e.t.forward;
-            //e.t.Rotate(0f, 0f, e.data.speed);
-
-            RaycastHit[] hits = Physics.SphereCastAll(e.data.sensor.position, e.data.detectionRange, e.data.sensor.forward, 0.1f);
-
-            foreach(RaycastHit hit in hits)
-            {
-                if(hit.transform != e.t)
-                {
-                    if (e.data.sensor != null)
-                    {
-                        float angle = Vector3.Angle(e.data.sensor.forward, hit.transform.position - e.data.sensor.position);
-                        if(angle < e.data.detectionAngle)
-                        {
-                            //Debug.Log(e.t.name + " " + hit.transform.name + " at " + Time.time);
-
-                            float distance = Vector3.Distance(hit.transform.position, e.t.position);
-
-                            //Explosion
-                            Vector3 expForce = e.data.explosionForce * (e.data.detectionRange - distance) * (hit.transform.forward - e.t.forward).normalized / e.data.detectionRange;
-                            if(expForce.magnitude > 0)
-                            {
-                                Debug.DrawRay(e.t.position, expForce, Color.red, 0.5f);
-                                direction += Vector3.ClampMagnitude(expForce, 1);
-                            }
-
-                            //Implosion
-                            //direction += e.data.implosionForce * distance * (hit.transform.forward - e.t.forward);
-
-                            //Follow
-                        }
-                    }
-                }
-
-                //BackToCenter
-                Vector3 forceToCenter = e.data.toCenterForce * Vector3.Distance(Vector3.zero, e.t.position) * -e.t.position.normalized / 500;
-                if(Vector3.Distance(Vector3.zero, e.t.position) > 20)
-                {
-                    direction += Vector3.ClampMagnitude(forceToCenter,1);
-                }
-            }
-
-            if(Vector3.Angle(direction, e.t.forward) > 10)
-            {
-                direction = Vector3.ProjectOnPlane(direction, e.t.forward);
-                Debug.Log(direction.magnitude);
-                direction += e.t.forward * (1 - direction.magnitude);
-            }
-
-            Quaternion targetRotation = Quaternion.LookRotation(direction);
-            e.t.rotation = Quaternion.Slerp(e.t.rotation, targetRotation, 0.05f);
-
-            //e.t.LookAt(e.t.position + direction);
-            e.t.position += direction;
+            perceptions[detector].Add(detected);
+        }
+        else
+        {
+            List<Comp> detectedList = new List<Comp>();
+            detectedList.Add(detected);
+            perceptions.Add(detector, detectedList);
         }
     }
 
+    protected override void OnUpdate()
+    {
+        Dictionary<Comp, List<Comp>> perceptions = new Dictionary<Comp, List<Comp>>();
+
+        perceptions.Clear();
+
+        ComponentGroupArray<Comp> list = GetEntities<Comp>();
+        List<Comp> visited = new List<Comp>();
+
+        foreach (Comp boidA in list)
+        {
+            foreach (Comp boidB in list)
+            {
+                if (boidB.t != boidA.t) // comparing the transforms as am not allowed to compare the struct
+                {
+                    if (!visited.Contains(boidB))
+                    {
+                        if(Vector3.Distance(boidA.t.position, boidB.t.position) < boidA.data.detectionRange)
+                        {
+                            if (isDetected(boidA, boidB))
+                            {
+                                addToDetecs(perceptions, boidA, boidB);
+                            }
+                            if (isDetected(boidB, boidA))
+                            {
+                                addToDetecs(perceptions, boidB, boidA);
+                            }
+                        }
+                    }
+                }
+            }
+
+            visited.Add(boidA);
+        }
+
+
+        foreach(Comp e in list)
+        {
+            if(perceptions.ContainsKey(e))
+            {
+                foreach (Comp otherBoid in perceptions[e])
+                {
+                    applyForces(e, otherBoid);
+                }
+            }
+
+            applyForces(e);
+
+            e.t.position += e.t.forward * e.data.speed;
+        }
+    }
+
+    private void applyForces(Comp boid)
+    {
+        //BackToCenter
+        Vector3 forceToCenter = boid.data.toCenterForce * Vector3.Distance(Vector3.zero, boid.t.position) * -boid.t.position.normalized / 500;
+        if (Vector3.Distance(Vector3.zero, boid.t.position) > 100)
+        {
+            Vector3 direction = Vector3.ClampMagnitude(forceToCenter, 1);
+            boid.t.forward = Vector3.RotateTowards(boid.t.forward, direction, 0.05f, 10f);
+        }
+    }
+
+    private void applyForces(Comp boid, Comp otherBoid)
+    {
+
+        float distance = Vector3.Distance(otherBoid.t.position, boid.t.position);
+
+        //Explosion
+        Vector3 expForce = boid.data.explosionForce * (boid.data.detectionRange - distance) * (boid.t.position - otherBoid.t.position).normalized / boid.data.detectionRange;
+        if (expForce.magnitude > 0)
+        {
+            Vector3 direction = Vector3.ClampMagnitude(expForce, 1);
+            boid.t.forward = Vector3.RotateTowards(boid.t.forward, direction, 0.05f, 10f);
+        }
+
+        //Implosion
+
+        //Follow
+    }
 }
