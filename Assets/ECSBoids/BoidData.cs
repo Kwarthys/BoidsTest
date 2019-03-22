@@ -18,6 +18,10 @@ public class BoidData : MonoBehaviour
 
 class BoidSystem : ComponentSystem
 {
+    private int frameIndex = 0;
+    private int amountToRefresh = 10;
+    private Dictionary<Comp, List<Comp>> perceptions = new Dictionary<Comp, List<Comp>>();
+
     struct Comp
     {
         public BoidData data;
@@ -32,54 +36,89 @@ class BoidSystem : ComponentSystem
     }
 
 
-    private void addToDetecs(Dictionary<Comp, List<Comp>> perceptions, Comp detector, Comp detected)
+    private void addToDictionnary(Dictionary<Comp, List<Comp>> perceptions, Comp key, Comp newValue)
     {
-        if (perceptions.ContainsKey(detector))
+        if (perceptions.ContainsKey(key))
         {
-            perceptions[detector].Add(detected);
+            if(!perceptions[key].Contains(newValue))
+            {
+                perceptions[key].Add(newValue);
+            }
         }
         else
         {
             List<Comp> detectedList = new List<Comp>();
-            detectedList.Add(detected);
-            perceptions.Add(detector, detectedList);
+            detectedList.Add(newValue);
+            perceptions.Add(key, detectedList);
         }
     }
 
     protected override void OnUpdate()
     {
-        Dictionary<Comp, List<Comp>> perceptions = new Dictionary<Comp, List<Comp>>();
-
-        perceptions.Clear();
-
         ComponentGroupArray<Comp> list = GetEntities<Comp>();
-        List<Comp> visited = new List<Comp>();
 
-        foreach (Comp boidA in list)
+        Dictionary<Comp, List<Comp>> inRange = new Dictionary<Comp, List<Comp>>();
+
+        int offset = 1;
+
+        for (int iBoidA = 0; iBoidA < list.Length; iBoidA++)
         {
-            foreach (Comp boidB in list)
+            for (int iBoidB = offset; iBoidB < list.Length; iBoidB++)
             {
-                if (boidB.t != boidA.t) // comparing the transforms as am not allowed to compare the struct
+                if (iBoidB != iBoidA)
                 {
-                    if (!visited.Contains(boidB))
+                    Comp boidA = list[iBoidA];
+                    Comp boidB = list[iBoidB];
+
+                    if (Vector3.Distance(boidA.t.position, boidB.t.position) < boidA.data.detectionRange)
                     {
-                        if(Vector3.Distance(boidA.t.position, boidB.t.position) < boidA.data.detectionRange)
-                        {
-                            if (isDetected(boidA, boidB))
-                            {
-                                addToDetecs(perceptions, boidA, boidB);
-                            }
-                            if (isDetected(boidB, boidA))
-                            {
-                                addToDetecs(perceptions, boidB, boidA);
-                            }
-                        }
+                        addToDictionnary(inRange, boidA, boidB);
+                        addToDictionnary(inRange, boidB, boidA);
                     }
                 }
             }
 
-            visited.Add(boidA);
+            offset++;
         }
+
+        int boidPerFrame = list.Length < amountToRefresh ? 1 : list.Length / amountToRefresh;
+        //Debug.Log("BoidPerFrame " + boidPerFrame);
+
+        int startingOffset = (frameIndex * boidPerFrame) % list.Length;
+        //Debug.Log(startingOffset + " = (" + frameIndex + " * " + boidPerFrame + " )% " + list.Length);
+
+        for (int iBoidA = startingOffset; iBoidA < list.Length && iBoidA < startingOffset + boidPerFrame; iBoidA++)
+        {
+            //Debug.Log(frameIndex + " Refreshing " + list[iBoidA].t.name);
+
+            if (perceptions.ContainsKey(list[iBoidA]))
+            {
+                perceptions[list[iBoidA]].Clear();
+            }
+
+            if (inRange.ContainsKey(list[iBoidA]))
+            {
+                foreach(Comp boidB in inRange[list[iBoidA]])
+                {
+                    Comp boidA = list[iBoidA];
+
+                    if (Vector3.Distance(boidA.t.position, boidB.t.position) < boidA.data.detectionRange)
+                    {
+                        if (isDetected(boidA, boidB))
+                        {
+                            addToDictionnary(perceptions, boidA, boidB);
+                        }
+                        if (isDetected(boidB, boidA))
+                        {
+                            addToDictionnary(perceptions, boidB, boidA);
+                        }
+                        
+                    }
+                }
+            }
+        }
+
+        frameIndex++;
 
 
         foreach(Comp e in list)
@@ -116,14 +155,28 @@ class BoidSystem : ComponentSystem
 
         //Explosion
         Vector3 expForce = boid.data.explosionForce * (boid.data.detectionRange - distance) * (boid.t.position - otherBoid.t.position).normalized / boid.data.detectionRange;
-        if (expForce.magnitude > 0)
+        if (expForce.magnitude > 0 && expForce != Vector3.zero)
         {
             Vector3 direction = Vector3.ClampMagnitude(expForce, 1);
             boid.t.forward = Vector3.RotateTowards(boid.t.forward, direction, 0.05f, 10f);
         }
 
         //Implosion
+        Vector3 implForce = boid.data.followForce * distance * (otherBoid.t.position - boid.t.position).normalized / boid.data.detectionRange;
+        if (implForce.magnitude > 0 && implForce != Vector3.zero)
+        {
+            Vector3 direction = Vector3.ClampMagnitude(implForce, 1);
+            //Debug.DrawRay(boid.t.position, direction * 50, Color.blue, 0.5f);
+            boid.t.forward = Vector3.RotateTowards(boid.t.forward, direction, 0.05f, 10f);
+        }
 
         //Follow
+        Vector3 followForce = boid.data.followForce * Vector3.Distance(otherBoid.t.forward, boid.t.forward) * (otherBoid.t.forward - boid.t.forward).normalized / boid.data.detectionRange;
+        if (followForce.magnitude > 0 && followForce != Vector3.zero)
+        {
+            Vector3 direction = Vector3.ClampMagnitude(followForce, 1);
+            //Debug.DrawRay(boid.t.position, direction * 50, Color.green, 0.5f);
+            boid.t.forward = Vector3.RotateTowards(boid.t.forward, direction, 0.05f, 10f);
+        }
     }
 }
