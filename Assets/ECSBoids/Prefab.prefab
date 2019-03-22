@@ -156,8 +156,8 @@ MonoBehaviour:
   speed: 1
   sensor: {fileID: 932440913124373617}
   detectionRange: 10
-  detectionAngle: 110
-  explosionForce: 1
+  detectionAngle: 90
+  explosionForce: 1.5
   implosionForce: 1
   followForce: 1
   toCenterForce: 1

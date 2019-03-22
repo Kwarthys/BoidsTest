@@ -19,7 +19,7 @@ public class BoidData : MonoBehaviour
 class BoidSystem : ComponentSystem
 {
     private int frameIndex = 0;
-    private int amountToRefresh = 10;
+    private int amountToRefresh = 5;
     private Dictionary<Comp, List<Comp>> perceptions = new Dictionary<Comp, List<Comp>>();
 
     struct Comp
@@ -57,13 +57,15 @@ class BoidSystem : ComponentSystem
     {
         ComponentGroupArray<Comp> list = GetEntities<Comp>();
 
-        Dictionary<Comp, List<Comp>> inRange = new Dictionary<Comp, List<Comp>>();
+        int boidPerFrame = list.Length < (amountToRefresh * list.Length) / 100 ? 1 : (amountToRefresh * list.Length) / 100;
+        //Debug.Log("BoidPerFrame " + boidPerFrame);
 
-        int offset = 1;
+        int startingOffset = (frameIndex * boidPerFrame) % list.Length;
+        //Debug.Log(startingOffset + " = (" + frameIndex + " * " + boidPerFrame + " )% " + list.Length);
 
-        for (int iBoidA = 0; iBoidA < list.Length; iBoidA++)
+        for (int iBoidA = startingOffset; iBoidA < list.Length && iBoidA < startingOffset + boidPerFrame; iBoidA++)
         {
-            for (int iBoidB = offset; iBoidB < list.Length; iBoidB++)
+            for (int iBoidB = 0; iBoidB < list.Length; iBoidB++)
             {
                 if (iBoidB != iBoidA)
                 {
@@ -72,47 +74,13 @@ class BoidSystem : ComponentSystem
 
                     if (Vector3.Distance(boidA.t.position, boidB.t.position) < boidA.data.detectionRange)
                     {
-                        addToDictionnary(inRange, boidA, boidB);
-                        addToDictionnary(inRange, boidB, boidA);
-                    }
-                }
-            }
-
-            offset++;
-        }
-
-        int boidPerFrame = list.Length < amountToRefresh ? 1 : list.Length / amountToRefresh;
-        //Debug.Log("BoidPerFrame " + boidPerFrame);
-
-        int startingOffset = (frameIndex * boidPerFrame) % list.Length;
-        //Debug.Log(startingOffset + " = (" + frameIndex + " * " + boidPerFrame + " )% " + list.Length);
-
-        for (int iBoidA = startingOffset; iBoidA < list.Length && iBoidA < startingOffset + boidPerFrame; iBoidA++)
-        {
-            //Debug.Log(frameIndex + " Refreshing " + list[iBoidA].t.name);
-
-            if (perceptions.ContainsKey(list[iBoidA]))
-            {
-                perceptions[list[iBoidA]].Clear();
-            }
-
-            if (inRange.ContainsKey(list[iBoidA]))
-            {
-                foreach(Comp boidB in inRange[list[iBoidA]])
-                {
-                    Comp boidA = list[iBoidA];
-
-                    if (Vector3.Distance(boidA.t.position, boidB.t.position) < boidA.data.detectionRange)
-                    {
-                        if (isDetected(boidA, boidB))
+                        if (Vector3.Distance(boidA.t.position, boidB.t.position) < boidA.data.detectionRange)
                         {
-                            addToDictionnary(perceptions, boidA, boidB);
+                            if (isDetected(boidA, boidB))
+                            {
+                                addToDictionnary(perceptions, boidA, boidB);
+                            }
                         }
-                        if (isDetected(boidB, boidA))
-                        {
-                            addToDictionnary(perceptions, boidB, boidA);
-                        }
-                        
                     }
                 }
             }
@@ -141,7 +109,7 @@ class BoidSystem : ComponentSystem
     {
         //BackToCenter
         Vector3 forceToCenter = boid.data.toCenterForce * Vector3.Distance(Vector3.zero, boid.t.position) * -boid.t.position.normalized / 500;
-        if (Vector3.Distance(Vector3.zero, boid.t.position) > 100)
+        if (Vector3.Distance(Vector3.zero, boid.t.position) > 200)
         {
             Vector3 direction = Vector3.ClampMagnitude(forceToCenter, 1);
             boid.t.forward = Vector3.RotateTowards(boid.t.forward, direction, 0.05f, 10f);

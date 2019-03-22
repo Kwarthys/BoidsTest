@@ -143,7 +143,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   boidPrefab: {fileID: 1142103991707088, guid: 042657145e9482b4da19761852779efa, type: 3}
   spawnArea: 100
-  flockSize: 200
+  flockSize: 500
 --- !u!4 &72558091
 Transform:
   m_ObjectHideFlags: 0
