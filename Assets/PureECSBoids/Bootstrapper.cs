@@ -31,7 +31,7 @@ public class Bootstrapper : MonoBehaviour
 
             entityManager.SetComponentData(boidEntity, new PureBoidData
             {
-                speed = 0.2f
+                speed = 15f
             });
 
             entityManager.SetComponentData(boidEntity, new Position
