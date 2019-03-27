@@ -55,29 +55,60 @@ public class PureBoidSystem : JobComponentSystem
         }
     }
 
-
-    private struct ManageDetectionJob : IJobParallelFor
+    private struct ApplyFLockRulesJob : IJobProcessComponentDataWithEntity<PureBoidData, Position, Rotation>
     {
-        [WriteOnly] public NativeMultiHashMap<int, int> toFill;
-        [ReadOnly] public NativeArray<Data> list;
+        public float deltaTime;
+        [ReadOnly] public NativeArray<Data> dataArray;
 
-        public void Execute(int index)
+        public void Execute(Entity entity, int index, ref PureBoidData data, ref Position pos, ref Rotation rot)
         {
-            toFill.Remove(index);
+            float3 forward = math.mul(rot.Value, new float3(0.0f, 1.0f, 0.0f));
+            float3 upward = math.mul(rot.Value, new float3(0.0f, 0.0f, 1.0f));
 
-            for(int i = 0; i < list.Length; ++i)
+            for (int i = 0; i < dataArray.Length; ++i)
             {
                 if(i != index)
                 {
-                    if(math.distance(list[i].position, list[index].position) < 10f)
+                    float distance = math.distance(dataArray[i].position, pos.Value);
+                    if (distance < 10f)
                     {
-                        toFill.Add(index, i);
+                        float angle = math.degrees(math.acos(math.dot(math.normalize(dataArray[i].position - pos.Value), forward)));
+                        if(angle < 100f)
+                        {
+                            float3 direction;
+                            float3 newHeading;
+
+                            float3 otherForward = math.mul(dataArray[i].rotation, new float3(0.0f, 1.0f, 0.0f));
+
+                            //Outward force
+                            direction = math.normalize(- dataArray[i].position + pos.Value);
+                            newHeading = forward + 0.5f * (10 - distance) * deltaTime * direction;                            
+                            rot.Value = quaternion.LookRotationSafe(upward, newHeading);
+
+                            //Inward force
+                            direction = -direction;
+                            newHeading = forward + 0.5f * distance * deltaTime * direction;
+                            rot.Value = quaternion.LookRotationSafe(upward, newHeading);
+
+                            //flocking force
+                            direction = otherForward - forward;
+                            newHeading = forward + 0.5f * distance * deltaTime * direction;
+                            rot.Value = quaternion.LookRotationSafe(upward, newHeading);
+                        }
                     }
                 }
             }
+
+            //ForceToCenter
+            if (math.distance(float3.zero, pos.Value) > 100)
+            {
+                float3 direction = math.normalize(float3.zero - pos.Value);
+                float3 newHeading = forward + 0.5f * (math.distance(float3.zero, pos.Value) - 100) * deltaTime * direction;
+                rot.Value = quaternion.LookRotationSafe(upward, newHeading);
+            }
+
         }
     }
-
 
     private struct BoidMovementJob : IJobProcessComponentData<PureBoidData, Position, Rotation>
     {
@@ -85,39 +116,14 @@ public class PureBoidSystem : JobComponentSystem
 
         public void Execute(ref PureBoidData data, ref Position pos, ref Rotation rot)
         {
-            float3 forward = math.mul(rot.Value, new float3(0.0f, 1.0f, 0.0f));
+            float3 forward = math.mul(rot.Value, new float3(0.0f, 1.0f, 0.0f));            
+
+            //Move
             pos.Value += data.speed * deltaTime * forward;
 
-            //WILL SOON DISAPEAR
-            rot.Value = math.mul(rot.Value, quaternion.RotateX(5f * deltaTime));
         }
     }
 
-
-    private struct ApplyFLockRulesJob : IJobProcessComponentDataWithEntity<PureBoidData, Position, Rotation>
-    {
-        public float deltaTime;
-        [ReadOnly] public NativeMultiHashMap<int, int> perceptionData;
-        [ReadOnly] public NativeArray<Data> dataArray;
-
-        public void Execute(Entity entity, int index, ref PureBoidData data, ref Position pos, ref Rotation rot)
-        {
-            NativeMultiHashMapIterator<int> i;
-            int item;
-            if(perceptionData.TryGetFirstValue(index, out item, out i))
-            {
-                Debug.Log(index + " sees " + item);
-
-                while (perceptionData.TryGetNextValue(out item, ref i))
-                {
-                    Debug.Log(index + " sees " + item);
-                }
-            }
-
-            
-        }
-    }
-    
     protected override JobHandle OnUpdate(JobHandle inputDeps)
     {
         float dt = Time.deltaTime;
@@ -129,21 +135,13 @@ public class PureBoidSystem : JobComponentSystem
 
         JobHandle listJH = listJob.ScheduleGroup(boidGroup, inputDeps);
 
-        ManageDetectionJob detecJob = new ManageDetectionJob
-        {
-            toFill = laMap
-        };
-
-        JobHandle dataJobHandle = detecJob.Schedule(boidGroup.CalculateLength(), 64, listJH);
-
         ApplyFLockRulesJob flockJob = new ApplyFLockRulesJob
         {
             deltaTime = dt,
-            perceptionData = laMap,
             dataArray = this.dataArray
         };
 
-        JobHandle flockJobHandle = flockJob.ScheduleGroup(boidGroup, dataJobHandle);
+        JobHandle flockJobHandle = flockJob.ScheduleGroup(boidGroup, listJH);
 
         BoidMovementJob job = new BoidMovementJob
         {

@@ -7,9 +7,3 @@ public struct PureBoidData : IComponentData
 {
     public float speed;
 }
-
-[InternalBufferCapacity(4)]
-public /*unsafe */struct NeighborsEntityBuffer : IBufferElementData
-{
-    public Entity Value;
-}
